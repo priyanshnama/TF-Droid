@@ -12,6 +12,8 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
 
     private var preview : ImageView? = null
     private var modelList : Spinner? = null
+    private var upload:Button?=null
+    private var predict:Button?=null
     private var mInputSize = 224
     private lateinit var classifier: Classifier
     private var model = ""
@@ -22,8 +24,12 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
 
         modelList = findViewById(R.id.model_list)
         preview = findViewById(R.id.preview)
+        upload = findViewById(R.id.upload)
+        predict = findViewById(R.id.predict)
         populateList()
         modelList?.onItemSelectedListener = this
+        upload!!.setOnClickListener {upload()}
+        predict!!.setOnClickListener {predict()}
     }
 
     private fun populateList() {
@@ -48,14 +54,14 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             model = "identify_number"
             mInputSize = 64
         }
-        classifier = Classifier(assets, model+ "/model.tflite", model+"/label.txt", mInputSize)
+        classifier = Classifier(assets, "$model/model.tflite", "$model/label.txt", mInputSize)
     }
 
     override fun onNothingSelected(parent: AdapterView<*>) {
         // Another interface callback
     }
 
-    fun upload(view : View) {
+    private fun upload() {
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
         startActivityForResult(intent, 100)
@@ -68,7 +74,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         }
     }
 
-    fun predict(view : View) {
+    fun predict() {
         try {
             val bitmap = ((preview as ImageView).drawable as BitmapDrawable).bitmap
             val result = classifier.recognizeImage(bitmap)

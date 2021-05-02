@@ -11,17 +11,15 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.*
 
-
-
-class Classifier(assetManager: AssetManager, modelPath: String, labelPath: String, inputSize: Int) {
+class Classifier(assetManager: AssetManager, modelPath: String, labelPath: String, private val inputSize: Int)
+{
     private var interpreter: Interpreter
     private var lableList: List<String>
-    private val INPUT_SIZE: Int = inputSize
-    private val PIXEL_SIZE: Int = 3
-    private val IMAGE_MEAN = 0
-    private val IMAGE_STD = 255.0f
-    private val MAX_RESULTS = 3
-    private val THRESHOLD = 0.4f
+    private val pixelSize: Int = 3
+    private val imageMean = 0
+    private val imageSTD = 255.0f
+    private val maxResults = 3
+    private val threshold = 0.4f
 
     data class Recognition(
         var id: String = "",
@@ -60,7 +58,7 @@ class Classifier(assetManager: AssetManager, modelPath: String, labelPath: Strin
      * on the passed bitmap
      */
     fun recognizeImage(bitmap: Bitmap): List<Recognition> {
-        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false)
+        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, false)
         val byteBuffer = convertBitmapToByteBuffer(scaledBitmap)
         val result = Array(1) { FloatArray(lableList.size) }
         interpreter.run(byteBuffer, result)
@@ -69,48 +67,48 @@ class Classifier(assetManager: AssetManager, modelPath: String, labelPath: Strin
 
 
     private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer {
-        val byteBuffer = ByteBuffer.allocateDirect(4 * INPUT_SIZE * INPUT_SIZE * PIXEL_SIZE)
+        val byteBuffer = ByteBuffer.allocateDirect(4 * inputSize * inputSize * pixelSize)
         byteBuffer.order(ByteOrder.nativeOrder())
-        val intValues = IntArray(INPUT_SIZE * INPUT_SIZE)
+        val intValues = IntArray(inputSize * inputSize)
 
         bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         var pixel = 0
-        for (i in 0 until INPUT_SIZE) {
-            for (j in 0 until INPUT_SIZE) {
+        for (i in 0 until inputSize) {
+            for (j in 0 until inputSize) {
                 val input = intValues[pixel++]
 
-                byteBuffer.putFloat((((input.shr(16)  and 0xFF) - IMAGE_MEAN) / IMAGE_STD))
-                byteBuffer.putFloat((((input.shr(8) and 0xFF) - IMAGE_MEAN) / IMAGE_STD))
-                byteBuffer.putFloat((((input and 0xFF) - IMAGE_MEAN) / IMAGE_STD))
+                byteBuffer.putFloat((((input.shr(16)  and 0xFF) - imageMean) / imageSTD))
+                byteBuffer.putFloat((((input.shr(8) and 0xFF) - imageMean) / imageSTD))
+                byteBuffer.putFloat((((input and 0xFF) - imageMean) / imageSTD))
             }
         }
         return byteBuffer
     }
 
-    private fun getSortedResult(labelProbArray: Array<FloatArray>): List<Classifier.Recognition> {
+    private fun getSortedResult(labelProbArray: Array<FloatArray>): List<Recognition> {
         Log.d("Classifier", "List Size:(%d, %d, %d)".format(labelProbArray.size,labelProbArray[0].size,lableList.size))
 
         val pq = PriorityQueue(
-            MAX_RESULTS,
-            Comparator<Classifier.Recognition> {
+            maxResults,
+            Comparator<Recognition> {
                     (_, _, confidence1), (_, _, confidence2)
-                -> java.lang.Float.compare(confidence1, confidence2) * -1
+                -> confidence1.compareTo(confidence2) * -1
             })
 
         for (i in lableList.indices) {
             val confidence = labelProbArray[0][i]
-            if (confidence >= THRESHOLD) {
-                pq.add(Classifier.Recognition("" + i,
+            if (confidence >= threshold) {
+                pq.add(Recognition("" + i,
                     if (lableList.size > i) lableList[i] else "Unknown", confidence)
                 )
             }
         }
         Log.d("Classifier", "pqsize:(%d)".format(pq.size))
 
-        val recognitions = ArrayList<Classifier.Recognition>()
-        val recognitionsSize = Math.min(pq.size, MAX_RESULTS)
+        val recognitions = ArrayList<Recognition>()
+        val recognitionsSize = pq.size.coerceAtMost(maxResults)
         for (i in 0 until recognitionsSize) {
-            recognitions.add(pq.poll())
+            recognitions.add(pq.poll()!!)
         }
         return recognitions
     }
